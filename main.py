@@ -7,7 +7,7 @@ import sys
 
 # Monitors
 MONITOR_INDEX = 1
-MONITOR_LIVE = 1
+MONITOR_LIVE = 2
 
 CROP_REGION = {}
 
@@ -75,10 +75,12 @@ def start_overlay():
                 img = np.array(sct.grab(region))
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 img = Image.fromarray(img)
+                img = img.resize((root.winfo_width(), root.winfo_height()))  # Resize to current window size
                 imgtk = ImageTk.PhotoImage(image=img)
 
                 label.imgtk = imgtk
                 label.configure(image=imgtk)
+
             if not movable:  # Only update if not in movable mode
                 root.after(30, update_frame)
         except KeyboardInterrupt:
@@ -91,10 +93,10 @@ def start_overlay():
         if movable:
             root.configure(cursor="fleur")
             label.pack_forget()  # Hide live feed
-            exit_btn.place(x=CROP_REGION["width"]-25, y=5)  # Show "X"
+            exit_btn.place(x=root.winfo_width()-25, y=5)
         else:
             root.configure(cursor="arrow")
-            exit_btn.place_forget()  # Hide "X"
+            exit_btn.place_forget()
             label.pack()  # Show live feed
             update_frame()  # Resume live feed
 
@@ -109,8 +111,22 @@ def start_overlay():
             y = root.winfo_pointery() - root.y_offset
             root.geometry(f"+{x}+{y}")
 
+    def resize_percent(event):
+        if movable:
+            width = root.winfo_width()
+            height = root.winfo_height()
+            if event.keysym == "Up":
+                width = int(width * 1.1)
+                height = int(height * 1.1)
+            elif event.keysym == "Down":
+                width = int(width * 0.9)
+                height = int(height * 0.9)
+            width = max(50, width)
+            height = max(50, height)
+            root.geometry(f"{width}x{height}")
+
     global root, label
-    movable = False  # Start with movable mode OFF
+    movable = False 
     root = tk.Tk()
     root.title("Live Overlay")
     root.attributes("-topmost", True)
@@ -124,18 +140,19 @@ def start_overlay():
     label = tk.Label(root, bg="black")
     label.pack()
 
-    # Exit button (hidden by default)
     exit_btn = tk.Button(root, text="X", command=root.destroy, bg="red", fg="white", bd=0, font=("Arial", 12, "bold"))
     exit_btn.place_forget()
 
-    # Bind mouse events for dragging
     root.bind("<Button-1>", start_move)
     root.bind("<B1-Motion>", do_move)
 
-    # Bind F4 to toggle movable mode
+    # F4 toggles movable mode
     root.bind("<F4>", toggle_movable)
 
-    # Periodically check for Ctrl+C
+    # Arrow keys resize by percentage
+    root.bind("<Up>", resize_percent)
+    root.bind("<Down>", resize_percent)
+
     def check_interrupt():
         try:
             root.after(100, check_interrupt)
